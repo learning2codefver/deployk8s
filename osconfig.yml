@@ -1,8 +1,60 @@
-##deploy net tools on the server
-sudo apt intall net tools
-##Apply all new updates to the OS
-sudo apt update && sudo apt upgrade -y
-##install Python and ansible 
-sudo apt install -y openssh-client python3 python3-pip
-sudo pip3 install ansible
-ansible --version
+---
+- name: Customize Ubuntu OS and set static IP
+  hosts: all
+  become: yes
+  tasks:
+    - name: Install net-tools
+      apt:
+        name: net-tools
+        state: present
+
+    - name: Update package list
+      apt:
+        update_cache: yes
+
+    - name: Upgrade all packages
+      apt:
+        upgrade: dist
+        autoremove: yes
+        autoclean: yes
+
+    - name: Install Python, pip, and openssh-client
+      apt:
+        name:
+          - python3
+          - python3-pip
+          - openssh-client
+        state: present
+
+    - name: Install Ansible via pip
+      pip:
+        name: ansible
+        executable: pip3
+        state: present
+
+    - name: Check Ansible version
+      command: ansible --version
+      register: ansible_version
+      changed_when: false
+
+    - name: Display Ansible version
+      debug:
+        msg: "{{ ansible_version.stdout_lines }}"
+
+    - name: Configure static IP address with Netplan
+      copy:
+        content: |
+          network:
+            version: 2
+            ethernets:
+              ens33:
+                addresses:
+                  - 10.10.80.9/24
+                gateway4: 10.10.80.1
+        dest: /etc/netplan/01-netcfg.yaml
+        mode: '0644'
+      notify: Apply Netplan configuration
+
+  handlers:
+    - name: Apply Netplan configuration
+      command: netplan apply
